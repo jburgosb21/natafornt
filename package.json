@@ -1,0 +1,11 @@
+{
+  "name": "crema-de-nata-frontend",
+  "version": "1.0.0",
+  "description": "Frontend de Crema de Nata",
+  "scripts": {
+    "start": "live-server --open=index.html"
+  },
+  "devDependencies": {
+    "live-server": "^1.2.2"
+  }
+}

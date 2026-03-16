@@ -1,6 +1,6 @@
 const { useState, useEffect } = React;
 
-const API_URL = "http://localhost:4000"; // apunta al backend local
+const API_URL = "https://nataback.onrender.com"; // apunta al backend en Render
 
 const ROLES = {
   ADMIN: "admin",
@@ -565,8 +565,8 @@ function MeseroView({ token, onSendOrder }) {
       </Card>
       <Card title="Sabores disponibles">
         <p className="text-xs text-rose-500 mb-2">
-          Puedes combinar todos los sabores que quieras. Tropical
-          siempre está disponible por defecto.
+          Puedes combinar todos los sabores que quieras. Todos los sabores
+          dependen del inventario que marque bodega.
         </p>
         <div className="flex flex-wrap gap-2">
           {flavors.map((f) => {

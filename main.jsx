@@ -8,6 +8,11 @@ function getApiUrl() {
     if (api) return api.replace(/\/+$/, "");
   } catch (_) {}
 
+  // Soporte para inyectar desde hosting: window.__API_URL__ (opcional)
+  if (typeof window.__API_URL__ === "string" && window.__API_URL__.trim()) {
+    return window.__API_URL__.trim().replace(/\/+$/, "");
+  }
+
   const isLocal =
     window.location.hostname === "localhost" ||
     window.location.hostname === "127.0.0.1";
@@ -668,12 +673,15 @@ function MeseroView({ token, onSendOrder }) {
     salsa: false,
     chispa: false,
     tajin: false,
-    galleta: false,
+    galleta: 0,
   });
   const [selectedFlavors, setSelectedFlavors] = useState([]);
   const [cart, setCart] = useState([]);
   const [mySales, setMySales] = useState([]);
   const [itemError, setItemError] = useState("");
+  const [orderStatus, setOrderStatus] = useState("");
+  const [orderError, setOrderError] = useState("");
+  const [isSending, setIsSending] = useState(false);
 
   const fetchFlavors = async () => {
     const res = await fetch(API_URL + "/menu", {
@@ -714,76 +722,157 @@ function MeseroView({ token, onSendOrder }) {
   };
 
   const addToCart = () => {
-    if (selectedFlavors.length === 0) {
-      setItemError("Elige al menos 1 sabor para añadir el helado.");
-      return;
-    }
-    setItemError("");
     const qty = Math.max(1, Number(quantity) || 1);
     const sabores = [...selectedFlavors];
+    const galletaCount = Math.max(0, Number(extras.galleta) || 0);
+
+    if (!plate.trim()) {
+      console.warn("No se puede añadir al carrito: falta nombre o placa del vehículo/cliente.");
+      setItemError("No se puede crear el pedido si no escribes el nombre o placa.");
+      return;
+    }
+
+    if (sabores.length === 0 && galletaCount === 0) {
+      setItemError("Elige al menos 1 sabor o agrega galletas para añadir al carrito.");
+      return;
+    }
+
+    setItemError("");
+
     const priceSize =
       size === "mini" ? 2000 :
       size === "pequeno" ? 2500 :
       size === "mediano" ? 3000 :
       size === "grande" ? 4000 : 2000;
-    const extrasPrice = (extras.galleta ? 500 : 0);
-    const unitTotal = priceSize + extrasPrice;
-    const total = unitTotal * qty;
 
-    const key = JSON.stringify({ location, plate, size, sabores: sabores.sort(), extras, unitTotal });
+    const iceExtras = {
+      salsa: !!extras.salsa,
+      tajin: !!extras.tajin,
+      chispa: !!extras.chispa,
+      galleta: 0,
+    };
 
-    setCart((c) => {
-      const existing = c.find((item) => item.key === key);
+    const iceUnitTotal = priceSize;
+    const iceTotal = iceUnitTotal * qty;
+
+    const cookieUnitTotal = 500;
+    const cookieTotal = cookieUnitTotal * galletaCount;
+
+    const insertOrUpdateItem = (cart, item) => {
+      const existing = cart.find((x) => x.key === item.key);
       if (existing) {
-        return c.map((item) =>
-          item.key === key
-            ? {
-                ...item,
-                quantity: item.quantity + qty,
-                total: item.total + total,
-              }
-            : item
+        return cart.map((x) =>
+          x.key === item.key
+            ? { ...x, quantity: x.quantity + item.quantity, total: x.total + item.total }
+            : x
         );
       }
-      return [
-        ...c,
-        {
+      return [...cart, item];
+    };
+
+    setCart((c) => {
+      let next = c;
+
+      if (sabores.length > 0) {
+        const iceKey = JSON.stringify({ location, plate, size, sabores: sabores.sort(), extras: iceExtras, unitTotal: iceUnitTotal });
+        next = insertOrUpdateItem(next, {
           id: Date.now() + Math.random(),
-          key,
+          key: iceKey,
           plate,
           location,
           size,
           sabores,
-          extras: { ...extras },
+          extras: iceExtras,
           observation: itemObservation,
           quantity: qty,
-          unitTotal,
-          total,
-        },
-      ];
+          unitTotal: iceUnitTotal,
+          total: iceTotal,
+        });
+      }
+
+      if (galletaCount > 0) {
+        const cookieKey = JSON.stringify({ location, plate, size: "galleta", sabores: ["galleta"], extras: {}, unitTotal: cookieUnitTotal });
+        next = insertOrUpdateItem(next, {
+          id: Date.now() + Math.random(),
+          key: cookieKey,
+          plate,
+          location,
+          size: "galleta",
+          sabores: ["galleta"],
+          extras: { salsa: false, tajin: false, chispa: false, galleta: 0 },
+          observation: "Porción de galleta",
+          quantity: galletaCount,
+          unitTotal: cookieUnitTotal,
+          total: cookieTotal,
+        });
+      }
+
+      return next;
     });
 
     setSelectedFlavors([]);
-    setExtras({ salsa: false, chispa: false, tajin: false, galleta: false });
+    setExtras({ salsa: false, chispa: false, tajin: false, galleta: 0 });
     setQuantity(1);
     setItemObservation("");
   };
 
   const sendOrder = async () => {
-    if (cart.length === 0) return;
-    const res = await fetch(API_URL + "/orders", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + token,
-      },
-      body: JSON.stringify({ items: cart }),
-    });
-    if (res.ok) {
+    console.log("[debug] sendOrder clicked", { cart, token, API_URL });
+
+    if (!plate.trim()) {
+      console.warn("No se puede enviar el pedido: falta nombre o placa del vehículo/cliente.");
+      setOrderError("No se puede crear el pedido si no escribes el nombre o placa.");
+      return;
+    }
+
+    if (cart.length === 0) {
+      setOrderError("El carrito está vacío. Añade helados antes de enviar.");
+      return;
+    }
+
+    setOrderError("");
+    setOrderStatus("Enviando pedido a caja...");
+    setIsSending(true);
+
+    try {
+      const res = await fetch(API_URL + "/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + token,
+        },
+        body: JSON.stringify({ items: cart }),
+      });
+
+      console.log("[debug] sendOrder response", res.status, res.statusText);
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        const message = body.error || `Error ${res.status}: ${res.statusText}`;
+        console.error("[debug] sendOrder error", message, body);
+        setOrderError(`No se pudo enviar el pedido: ${message}`);
+        setOrderStatus("");
+        return;
+      }
+
+      const data = await res.json().catch(() => ({}));
+      console.log("[debug] sendOrder success", data);
+
       setCart([]);
       await fetchMySales();
       onSendOrder && onSendOrder();
+      setOrderStatus("Pedido enviado a caja correctamente.");
+    } catch (err) {
+      console.error("[debug] sendOrder exception", err);
+      setOrderError(`Error de red al enviar pedido: ${err.message}`);
+      setOrderStatus("");
+    } finally {
+      setIsSending(false);
     }
+  };
+
+  const removeCartItem = (itemId) => {
+    setCart((c) => c.filter((item) => item.id !== itemId));
   };
 
   const cancelSale = async (orderId) => {
@@ -811,6 +900,7 @@ function MeseroView({ token, onSendOrder }) {
     pequeno: "Pequeño",
     mediano: "Mediano",
     grande: "Grande",
+    galleta: "Galleta",
   };
 
   return (
@@ -819,14 +909,17 @@ function MeseroView({ token, onSendOrder }) {
         <div className="space-y-3">
           <div className="flex flex-col gap-1">
             <label className="text-xs text-rose-500">
-              Placa del vehículo
+              Nombre o placa del vehículo/cliente
             </label>
             <input
               className="rounded-full border border-rose-200 px-3 py-2 text-sm"
               value={plate}
-              onChange={(e) => setPlate(e.target.value)}
-              placeholder="ABC123"
+              onChange={(e) => setPlate(e.target.value.toUpperCase())}
+              placeholder="PLACA o NOMBRE"
             />
+            {!plate.trim() && (
+              <p className="text-xs text-red-600">Es obligatorio ingresar nombre o placa del vehículo/cliente.</p>
+            )}
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs text-rose-500">
@@ -913,12 +1006,20 @@ function MeseroView({ token, onSendOrder }) {
                 Chispas
               </PastelButton>
               <div className="flex items-center gap-2">
+                <span className="text-[12px]">Galletas: {extras.galleta} x $500 = ${extras.galleta * 500}</span>
                 <PastelButton
                   type="button"
-                  variant={extras.galleta ? "primary" : "soft"}
-                  onClick={() => setExtras((e) => ({ ...e, galleta: !e.galleta }))}
+                  onClick={() => setExtras((e) => ({ ...e, galleta: Math.max(0, e.galleta - 1) }))}
+                  variant="soft"
                 >
-                  Porción de galleta (+$500)
+                  -
+                </PastelButton>
+                <PastelButton
+                  type="button"
+                  onClick={() => setExtras((e) => ({ ...e, galleta: e.galleta + 1 }))}
+                  variant="soft"
+                >
+                  +
                 </PastelButton>
               </div>
             </div>
@@ -928,13 +1029,6 @@ function MeseroView({ token, onSendOrder }) {
               {itemError}
             </p>
           )}
-        </div>
-      </Card>
-      <Card title="Acciones del pedido">
-        <div className="flex justify-center">
-          <PastelButton type="button" onClick={addToCart} variant="primary" className="w-full max-w-xs">
-            Añadir helado al carrito
-          </PastelButton>
         </div>
       </Card>
       <Card title="Sabores disponibles">
@@ -989,6 +1083,13 @@ function MeseroView({ token, onSendOrder }) {
           )}
         </div>
       </Card>
+      <Card title="Acciones del pedido">
+        <div className="flex justify-center">
+          <PastelButton type="button" onClick={addToCart} variant="primary" className="w-full max-w-xs">
+            Añadir helado al carrito
+          </PastelButton>
+        </div>
+      </Card>
       <Card title="Carrito listo para caja">
         <div className="space-y-3 max-h-80 overflow-auto pr-1 text-sm">
           {cart.map((item) => (
@@ -1009,15 +1110,36 @@ function MeseroView({ token, onSendOrder }) {
                   {item.location} {item.plate && `• ${item.plate}`}
                 </span>
               </div>
-              <p className="text-[11px] text-rose-600">
-                Sabores: {item.sabores.join(", ")}
-              </p>
-              <p className="text-[11px] text-slate-600">
-                Extras: {item.extras.salsa ? "salsa" : ""}
-                {item.extras.chispa ? (item.extras.salsa ? ", chispas" : "chispas") : ""}
-                {item.extras.galleta ? (item.extras.salsa || item.extras.chispa ? ", galleta" : "galleta") : ""}
-                {(!item.extras.salsa && !item.extras.chispa && !item.extras.galleta) ? "ninguno" : ""}
-              </p>
+              <div className="mt-2 flex justify-end">
+                <PastelButton
+                  type="button"
+                  variant="soft"
+                  className="text-[11px] px-2 py-1"
+                  onClick={() => removeCartItem(item.id)}
+                >
+                  Quitar del carrito
+                </PastelButton>
+              </div>
+              {item.size !== "galleta" ? (
+                <>
+                  <p className="text-[11px] text-rose-600">
+                    Sabores: {item.sabores.join(", ")}
+                  </p>
+                  <p className="text-[11px] text-slate-600">
+                    Extras: {item.extras.salsa ? "salsa" : ""}
+                    {item.extras.chispa ? (item.extras.salsa ? ", chispas" : "chispas") : ""}
+                    {item.extras.tajin ? (item.extras.salsa || item.extras.chispa ? ", tajín" : "tajín") : ""}
+                    {item.extras.galleta > 0 ? (item.extras.salsa || item.extras.chispa || item.extras.tajin ? ", " : "") + item.extras.galleta + " galletas" : ""}
+                    {(!item.extras.salsa && !item.extras.chispa && !item.extras.tajin && item.extras.galleta <= 0) ? "ninguno" : ""}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-[11px] text-rose-600">Producto: Galletas</p>
+                  <p className="text-[11px] text-slate-600">Extras: ninguno</p>
+                </>
+              )}
+
               {item.observation && (
                 <p className="text-[11px] text-amber-700">Observación: {item.observation}</p>
               )}
@@ -1029,13 +1151,31 @@ function MeseroView({ token, onSendOrder }) {
             </p>
           )}
         </div>
-        <PastelButton
-          type="button"
-          onClick={sendOrder}
-          disabled={cart.length === 0}
-        >
-          Enviar pedido a caja
-        </PastelButton>
+      </Card>
+      <Card title="Enviar pedido a caja">
+        <div className="space-y-3">
+          <div className="flex justify-center">
+            <PastelButton
+              type="button"
+              onClick={sendOrder}
+              variant="secondary"
+              disabled={cart.length === 0 || isSending}
+              className="w-full max-w-xs"
+            >
+              {isSending ? "Enviando..." : "Enviar carrito a caja"}
+            </PastelButton>
+          </div>
+          {orderStatus && (
+            <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-2xl px-3 py-2">
+              {orderStatus}
+            </p>
+          )}
+          {orderError && (
+            <p className="text-xs text-rose-700 bg-rose-50 border border-rose-100 rounded-2xl px-3 py-2">
+              {orderError}
+            </p>
+          )}
+        </div>
       </Card>
       <Card title="Mis ventas (este mes)">
         <div className="space-y-2 max-h-80 overflow-auto pr-1 text-sm">
@@ -1065,9 +1205,19 @@ function MeseroView({ token, onSendOrder }) {
               </div>
               <p className="text-xs text-rose-600">Total: ${order.total}</p>
               {order.items.map((item) => (
-                <p key={item.id} className="text-[11px] text-slate-600">
-                  x{item.quantity || 1} {item.sabores.join(", ")} ({item.size})
-                </p>
+                <div key={item.id} className="mb-1">
+                  <p className="text-[11px] text-slate-600">
+                    x{item.quantity || 1} {item.sabores.join(", ")} ({item.size})
+                  </p>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-rose-100 text-rose-700 border border-rose-200">
+                      Zona: {item.location || "-"}
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+                      Cliente/Placa: {item.plate || "sin placa"}
+                    </span>
+                  </div>
+                </div>
               ))}
             </div>
           ))}
@@ -1205,8 +1355,13 @@ function CajaView({ token }) {
                       <span className="font-semibold text-rose-700">
                         {sizeLabel[item.size]} x{item.quantity || 1} - ${item.total}
                       </span>
-                      <span className="text-[11px] text-rose-500">
-                        {item.location}{item.plate ? ` • ${item.plate}` : ""}
+                    </div>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-rose-100 text-rose-700 border border-rose-200">
+                        Zona: {item.location || "-"}
+                      </span>
+                      <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+                        Cliente/Placa: {item.plate || "sin placa"}
                       </span>
                     </div>
                     {item.observation && (

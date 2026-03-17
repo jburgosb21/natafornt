@@ -661,12 +661,13 @@ function MeseroView({ token, onSendOrder }) {
   const [flavors, setFlavors] = useState([]);
   const [location, setLocation] = useState("parqueadero");
   const [plate, setPlate] = useState("");
-  const [size, setSize] = useState("pequeno");
+  const [size, setSize] = useState("mini");
   const [quantity, setQuantity] = useState(1);
   const [itemObservation, setItemObservation] = useState("");
   const [extras, setExtras] = useState({
     salsa: false,
     chispa: false,
+    tajin: false,
     galleta: false,
   });
   const [selectedFlavors, setSelectedFlavors] = useState([]);
@@ -721,7 +722,8 @@ function MeseroView({ token, onSendOrder }) {
     const qty = Math.max(1, Number(quantity) || 1);
     const sabores = [...selectedFlavors];
     const priceSize =
-      size === "pequeno" ? 2000 :
+      size === "mini" ? 2000 :
+      size === "pequeno" ? 2500 :
       size === "mediano" ? 3000 :
       size === "grande" ? 4000 : 2000;
     const extrasPrice = (extras.galleta ? 500 : 0);
@@ -762,7 +764,7 @@ function MeseroView({ token, onSendOrder }) {
     });
 
     setSelectedFlavors([]);
-    setExtras({ salsa: false, chispa: false, galleta: false });
+    setExtras({ salsa: false, chispa: false, tajin: false, galleta: false });
     setQuantity(1);
     setItemObservation("");
   };
@@ -805,6 +807,7 @@ function MeseroView({ token, onSendOrder }) {
   };
 
   const sizeLabel = {
+    mini: "Mini",
     pequeno: "Pequeño",
     mediano: "Mediano",
     grande: "Grande",
@@ -831,9 +834,10 @@ function MeseroView({ token, onSendOrder }) {
             </label>
             <div className="flex flex-wrap gap-2">
               {[
+                ["zona-a", "Zona A"],
+                ["zona-b", "Zona B"],
                 ["parqueadero", "Parqueadero"],
-                ["calle", "Calle"],
-                ["mesas", "Mesas"],
+                ["patio", "Patio"],
               ].map(([value, label]) => (
                 <PastelButton
                   key={value}
@@ -870,7 +874,7 @@ function MeseroView({ token, onSendOrder }) {
               Tamaño del vaso
             </label>
             <div className="flex flex-wrap gap-2">
-              {["pequeno", "mediano", "grande"].map((s) => (
+              {["mini", "pequeno", "mediano", "grande"].map((s) => (
                 <PastelButton
                   key={s}
                   variant={size === s ? "primary" : "soft"}
@@ -893,6 +897,13 @@ function MeseroView({ token, onSendOrder }) {
                 onClick={() => toggleExtra("salsa")}
               >
                 Salsa
+              </PastelButton>
+              <PastelButton
+                type="button"
+                variant={extras.tajin ? "primary" : "soft"}
+                onClick={() => toggleExtra("tajin")}
+              >
+                Tajín
               </PastelButton>
               <PastelButton
                 type="button"

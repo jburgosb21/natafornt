@@ -32,15 +32,28 @@ const ROLES = {
   CAJA: "caja",
 };
 
-function Card({ title, children, className = "" }) {
+function Card({ title, children, variant = "default", className = "" }) {
+  const styles = {
+    default: "border-crema-rosa/40",
+    mesero: "border-rose-300 ring-1 ring-rose-100",
+    caja: "border-emerald-300 ring-1 ring-emerald-100",
+    bodega: "border-cyan-300 ring-1 ring-cyan-100",
+    admin: "border-indigo-300 ring-1 ring-indigo-100",
+  };
+
+  const titleStyles = {
+    default: "text-rose-500",
+    mesero: "text-rose-600",
+    caja: "text-emerald-600",
+    bodega: "text-cyan-600",
+    admin: "text-indigo-600",
+  };
+
   return (
     <div
-      className={
-        "rounded-3xl shadow-lg bg-white/80 border border-crema-rosa/40 p-6 flex flex-col gap-4 " +
-        className
-      }
+      className={`rounded-3xl shadow-2xl backdrop-blur-sm bg-white/90 ${styles[variant] || styles.default} p-6 flex flex-col gap-4 ${className}`}
     >
-      <h2 className="text-2xl font-semibold text-rose-500">{title}</h2>
+      <h2 className={`text-2xl md:text-3xl font-extrabold tracking-tight ${titleStyles[variant] || titleStyles.default}`}>{title}</h2>
       {children}
     </div>
   );
@@ -48,13 +61,15 @@ function Card({ title, children, className = "" }) {
 
 function PastelButton({ children, variant = "primary", className = "", ...props }) {
   const base =
-    "px-4 py-2 rounded-full text-sm font-semibold transition transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed";
+    "px-5 py-3 rounded-full text-base font-bold transition-transform duration-200 transform hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-300 disabled:opacity-60 disabled:cursor-not-allowed";
   const variants = {
-    primary: "bg-rose-400 text-white hover:bg-rose-500",
+    primary: "bg-rose-500 text-white hover:bg-rose-600",
     outline:
-      "bg-white text-rose-500 border border-rose-300 hover:bg-rose-50",
+      "bg-white text-rose-600 border border-rose-300 hover:bg-rose-50",
     soft: "bg-crema-rosa text-rose-700 hover:bg-rose-200",
     pill: "bg-crema-caramelo text-amber-900 hover:bg-amber-200",
+    success: "bg-emerald-500 text-white hover:bg-emerald-600",
+    warning: "bg-amber-500 text-white hover:bg-amber-600",
   };
   return (
     <button className={`${base} ${variants[variant]} ${className}`} {...props}>
@@ -455,7 +470,22 @@ function AdminView({ token }) {
 }
 
 function StatsView({ token }) {
-  const [stats, setStats] = useState({ daily: [], weekly: [], yearly: [] });
+  const [stats, setStats] = useState({
+    daily: [],
+    weekly: [],
+    yearly: [],
+    totals: {
+      total_orders: 0,
+      total_revenue: 0,
+      avg_order_value: 0,
+      today_orders: 0,
+      today_revenue: 0,
+    },
+    status_breakdown: [],
+    top_meseros: [],
+    top_sizes: [],
+    top_sabores: [],
+  });
 
   useEffect(() => {
     const loadStats = async () => {
@@ -474,7 +504,57 @@ function StatsView({ token }) {
   return (
     <div className="space-y-6">
       <Card title="Estadísticas de pedidos">
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div className="p-4 bg-white rounded-2xl shadow-sm">
+            <h3 className="text-sm font-semibold text-rose-700 mb-2">Totales</h3>
+            <p className="text-xs text-gray-600">Pedidos totales: {stats.totals.total_orders}</p>
+            <p className="text-xs text-gray-600">Ventas totales: ${stats.totals.total_revenue}</p>
+            <p className="text-xs text-gray-600">Ticket promedio: ${Number(stats.totals.avg_order_value).toFixed(2)}</p>
+            <p className="text-xs text-gray-600">Hoy pedidos: {stats.totals.today_orders}</p>
+            <p className="text-xs text-gray-600">Hoy ventas: ${stats.totals.today_revenue}</p>
+          </div>
+
+          <div className="p-4 bg-white rounded-2xl shadow-sm">
+            <h3 className="text-sm font-semibold text-rose-700 mb-2">Situación por estado</h3>
+            {stats.status_breakdown.length === 0 ? (
+              <p className="text-xs text-rose-400">No hay datos</p>
+            ) : (
+              stats.status_breakdown.map((s) => (
+                <p key={s.status} className="text-xs text-gray-600">
+                  {s.status}: {s.count}
+                </p>
+              ))
+            )}
+          </div>
+
+          <div className="p-4 bg-white rounded-2xl shadow-sm">
+            <h3 className="text-sm font-semibold text-rose-700 mb-2">Meseros top</h3>
+            {stats.top_meseros.length === 0 ? (
+              <p className="text-xs text-rose-400">No hay datos</p>
+            ) : (
+              stats.top_meseros.map((r) => (
+                <p key={r.username} className="text-xs text-gray-600">
+                  {r.username}: {r.orders_count} pedidos (${r.total_revenue})
+                </p>
+              ))
+            )}
+          </div>
+
+          <div className="p-4 bg-white rounded-2xl shadow-sm">
+            <h3 className="text-sm font-semibold text-rose-700 mb-2">Tamaños top</h3>
+            {stats.top_sizes.length === 0 ? (
+              <p className="text-xs text-rose-400">No hay datos</p>
+            ) : (
+              stats.top_sizes.map((r) => (
+                <p key={r.size} className="text-xs text-gray-600">
+                  {r.size}: {r.total_units} unidades (${r.total_revenue})
+                </p>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4 mt-4">
           <div className="p-4 bg-white rounded-2xl shadow-sm">
             <h3 className="text-sm font-semibold text-rose-700 mb-2">Últimos 30 días</h3>
             {stats.daily.length === 0 ? (
@@ -487,6 +567,7 @@ function StatsView({ token }) {
               ))
             )}
           </div>
+
           <div className="p-4 bg-white rounded-2xl shadow-sm">
             <h3 className="text-sm font-semibold text-rose-700 mb-2">Últimas 12 semanas</h3>
             {stats.weekly.length === 0 ? (
@@ -499,18 +580,19 @@ function StatsView({ token }) {
               ))
             )}
           </div>
-          <div className="p-4 bg-white rounded-2xl shadow-sm">
-            <h3 className="text-sm font-semibold text-rose-700 mb-2">Por año</h3>
-            {stats.yearly.length === 0 ? (
-              <p className="text-xs text-rose-400">No hay datos</p>
-            ) : (
-              stats.yearly.map((s) => (
-                <p key={s.period} className="text-xs text-gray-600">
-                  {s.period}: {s.count} pedidos | ${s.total}
-                </p>
-              ))
-            )}
-          </div>
+        </div>
+
+        <div className="p-4 bg-white rounded-2xl shadow-sm mt-4">
+          <h3 className="text-sm font-semibold text-rose-700 mb-2">Top sabores</h3>
+          {stats.top_sabores.length === 0 ? (
+            <p className="text-xs text-rose-400">No hay datos</p>
+          ) : (
+            stats.top_sabores.map((r) => (
+              <p key={r.sabor} className="text-xs text-gray-600">
+                {r.sabor}: {r.total_units} unidades
+              </p>
+            ))
+          )}
         </div>
       </Card>
     </div>
@@ -662,6 +744,57 @@ function BodegaView({ token }) {
   );
 }
 
+function renderExtras(extras, size) {
+  if (size === "galleta") {
+    return (
+      <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-300">
+        Extras: ninguno
+      </span>
+    );
+  }
+
+  const tags = [];
+
+  if (extras.salsa) {
+    tags.push(
+      <span key="salsa" className="text-[10px] font-semibold px-2 py-1 rounded-full bg-rose-100 text-rose-700 border border-rose-200">
+        Salsa
+      </span>
+    );
+  }
+  if (extras.chispa) {
+    tags.push(
+      <span key="chispas" className="text-[10px] font-semibold px-2 py-1 rounded-full bg-cyan-100 text-cyan-700 border border-cyan-200">
+        Chispas
+      </span>
+    );
+  }
+  if (extras.tajin) {
+    tags.push(
+      <span key="tajin" className="text-[10px] font-semibold px-2 py-1 rounded-full bg-violet-100 text-violet-700 border border-violet-200">
+        Tajín
+      </span>
+    );
+  }
+  if (extras.galleta > 0) {
+    tags.push(
+      <span key="galletas" className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+        Galletas: {extras.galleta}
+      </span>
+    );
+  }
+
+  if (tags.length === 0) {
+    return (
+      <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-300">
+        Extras: ninguno
+      </span>
+    );
+  }
+
+  return <div className="flex flex-wrap gap-2">{tags}</div>;
+}
+
 function MeseroView({ token, onSendOrder }) {
   const [flavors, setFlavors] = useState([]);
   const [location, setLocation] = useState("parqueadero");
@@ -682,6 +815,33 @@ function MeseroView({ token, onSendOrder }) {
   const [orderStatus, setOrderStatus] = useState("");
   const [orderError, setOrderError] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+  const [showToast, setShowToast] = useState(false);
+
+
+  const CART_STORAGE_KEY = "crema-de-nata-cart-v1";
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(CART_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setCart(parsed);
+        }
+      }
+    } catch (err) {
+      console.warn("No se pudo restaurar el carrito desde localStorage", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+    } catch (err) {
+      console.warn("No se pudo guardar el carrito en localStorage", err);
+    }
+  }, [cart]);
 
   const fetchFlavors = async () => {
     const res = await fetch(API_URL + "/menu", {
@@ -819,12 +979,6 @@ function MeseroView({ token, onSendOrder }) {
   const sendOrder = async () => {
     console.log("[debug] sendOrder clicked", { cart, token, API_URL });
 
-    if (!plate.trim()) {
-      console.warn("No se puede enviar el pedido: falta nombre o placa del vehículo/cliente.");
-      setOrderError("No se puede crear el pedido si no escribes el nombre o placa.");
-      return;
-    }
-
     if (cart.length === 0) {
       setOrderError("El carrito está vacío. Añade helados antes de enviar.");
       return;
@@ -833,6 +987,8 @@ function MeseroView({ token, onSendOrder }) {
     setOrderError("");
     setOrderStatus("Enviando pedido a caja...");
     setIsSending(true);
+    setToastMessage("");
+    setShowToast(false);
 
     try {
       const res = await fetch(API_URL + "/orders", {
@@ -862,6 +1018,9 @@ function MeseroView({ token, onSendOrder }) {
       await fetchMySales();
       onSendOrder && onSendOrder();
       setOrderStatus("Pedido enviado a caja correctamente.");
+      setToastMessage("✅ Pedido enviado con éxito");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
     } catch (err) {
       console.error("[debug] sendOrder exception", err);
       setOrderError(`Error de red al enviar pedido: ${err.message}`);
@@ -871,8 +1030,93 @@ function MeseroView({ token, onSendOrder }) {
     }
   };
 
+  const updateCartItemQuantity = (itemId, nextQuantity) => {
+    const qty = Math.max(1, Number(nextQuantity) || 1);
+    setCart((c) =>
+      c.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              quantity: qty,
+              total: (item.unitTotal || 0) * qty,
+            }
+          : item
+      )
+    );
+  };
+
   const removeCartItem = (itemId) => {
     setCart((c) => c.filter((item) => item.id !== itemId));
+  };
+
+  const clearCart = () => {
+    setCart([]);
+    localStorage.removeItem(CART_STORAGE_KEY);
+  };
+
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat("es-CO", {
+      style: "currency",
+      currency: "COP",
+      maximumFractionDigits: 0,
+    }).format(value);
+  };
+
+  const printReceipt = () => {
+    if (cart.length === 0) {
+      alert("El carrito está vacío. Agrega al menos un ítem antes de imprimir recibo.");
+      return;
+    }
+
+    const totalAmount = cart.reduce((sum, item) => sum + (item.total || 0), 0);
+    const lines = cart
+      .map((item, idx) => {
+        const flavors = (item.sabores || []).join(", ");
+        const extrasLabels = [];
+        if (item.extras?.salsa) extrasLabels.push("Salsa");
+        if (item.extras?.tajin) extrasLabels.push("Tajín");
+        if (item.extras?.chispa) extrasLabels.push("Chispas");
+        if (item.extras?.galleta > 0) extrasLabels.push(`Galletas x${item.extras.galleta}`);
+
+        return `\n${idx + 1}. ${sizeLabel[item.size] || item.size} x${item.quantity} $${item.total} - ${item.location} / ${item.plate || "n.d."}\n   Sabores: ${flavors || "-"}\n   Extras: ${extrasLabels.length ? extrasLabels.join(", ") : "ninguno"}${item.observation ? `\n   Obs: ${item.observation}` : ""}`;
+      })
+      .join("\n");
+
+    const receiptHtml = `
+      <html>
+        <head>
+          <title>Recibo Crema de Nata</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 16px; }
+            h1 { color: #b91c1c; }
+            pre { white-space: pre-wrap; font-size: 14px; }
+            .total { font-weight: bold; font-size: 18px; margin-top: 12px; }
+          </style>
+        </head>
+        <body>
+          <h1>Crema de Nata - Recibo de venta</h1>
+          <p>Cliente/Placa: ${plate || "n.d."}</p>
+          <p>Ubicación: ${location || "n.d."}</p>
+          <p>Fecha: ${new Date().toLocaleString()}</p>
+          <pre>${lines}</pre>
+          <p class="total">Total: ${formatCurrency(totalAmount)}</p>
+          <p>Gracias por su compra.</p>
+        </body>
+      </html>
+    `;
+
+    const newWindow = window.open("", "_blank", "width=760,height=800");
+    if (!newWindow) {
+      alert("No se pudo abrir ventana de impresión. Revisa tu bloqueador de popups.");
+      return;
+    }
+
+    newWindow.document.write(receiptHtml);
+    newWindow.document.close();
+    newWindow.focus();
+    setTimeout(() => {
+      newWindow.print();
+    }, 250);
   };
 
   const cancelSale = async (orderId) => {
@@ -905,7 +1149,12 @@ function MeseroView({ token, onSendOrder }) {
 
   return (
     <div className="grid lg:grid-cols-3 gap-6">
-      <Card title="Datos del pedido">
+      {showToast && (
+        <div className="fixed bottom-4 right-4 z-50 bg-emerald-100 border border-emerald-300 text-emerald-900 rounded-xl px-4 py-2 shadow-lg">
+          {toastMessage}
+        </div>
+      )}
+      <Card title="Datos del pedido" variant="mesero">
         <div className="space-y-3">
           <div className="flex flex-col gap-1">
             <label className="text-xs text-rose-500">
@@ -1031,7 +1280,7 @@ function MeseroView({ token, onSendOrder }) {
           )}
         </div>
       </Card>
-      <Card title="Sabores disponibles">
+      <Card title="Sabores disponibles" variant="mesero">
         <p className="text-xs text-rose-500 mb-2">
           Puedes combinar todos los sabores que quieras. Todos los sabores
           dependen del inventario que marque bodega.
@@ -1083,14 +1332,14 @@ function MeseroView({ token, onSendOrder }) {
           )}
         </div>
       </Card>
-      <Card title="Acciones del pedido">
+      <Card title="Acciones del pedido" variant="mesero">
         <div className="flex justify-center">
           <PastelButton type="button" onClick={addToCart} variant="primary" className="w-full max-w-xs">
             Añadir helado al carrito
           </PastelButton>
         </div>
       </Card>
-      <Card title="Carrito listo para caja">
+      <Card title="Carrito listo para caja" variant="mesero">
         <div className="space-y-3 max-h-80 overflow-auto pr-1 text-sm">
           {cart.map((item) => (
             <div
@@ -1099,9 +1348,36 @@ function MeseroView({ token, onSendOrder }) {
             >
               <div className="flex justify-between items-center">
                 <div>
-                  <span className="font-semibold text-rose-700">
-                    {sizeLabel[item.size]} x{item.quantity} • ${item.total}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-rose-700">
+                      {sizeLabel[item.size]} • ${item.total}
+                    </span>
+                    <label className="text-[11px] text-rose-500">Cant:</label>
+                    <PastelButton
+                      type="button"
+                      variant="soft"
+                      className="text-xs px-2"
+                      onClick={() => updateCartItemQuantity(item.id, item.quantity - 1)}
+                      disabled={item.quantity <= 1}
+                    >
+                      -
+                    </PastelButton>
+                    <input
+                      type="number"
+                      min="1"
+                      value={item.quantity}
+                      onChange={(e) => updateCartItemQuantity(item.id, Number(e.target.value))}
+                      className="w-16 rounded-full border border-rose-200 px-2 py-1 text-xs"
+                    />
+                    <PastelButton
+                      type="button"
+                      variant="soft"
+                      className="text-xs px-2"
+                      onClick={() => updateCartItemQuantity(item.id, item.quantity + 1)}
+                    >
+                      +
+                    </PastelButton>
+                  </div>
                   <p className="text-[11px] text-rose-500">
                     unidad: ${item.unitTotal}
                   </p>
@@ -1110,28 +1386,14 @@ function MeseroView({ token, onSendOrder }) {
                   {item.location} {item.plate && `• ${item.plate}`}
                 </span>
               </div>
-              <div className="mt-2 flex justify-end">
-                <PastelButton
-                  type="button"
-                  variant="soft"
-                  className="text-[11px] px-2 py-1"
-                  onClick={() => removeCartItem(item.id)}
-                >
-                  Quitar del carrito
-                </PastelButton>
-              </div>
               {item.size !== "galleta" ? (
                 <>
-                  <p className="text-[11px] text-rose-600">
-                    Sabores: {item.sabores.join(", ")}
-                  </p>
-                  <p className="text-[11px] text-slate-600">
-                    Extras: {item.extras.salsa ? "salsa" : ""}
-                    {item.extras.chispa ? (item.extras.salsa ? ", chispas" : "chispas") : ""}
-                    {item.extras.tajin ? (item.extras.salsa || item.extras.chispa ? ", tajín" : "tajín") : ""}
-                    {item.extras.galleta > 0 ? (item.extras.salsa || item.extras.chispa || item.extras.tajin ? ", " : "") + item.extras.galleta + " galletas" : ""}
-                    {(!item.extras.salsa && !item.extras.chispa && !item.extras.tajin && item.extras.galleta <= 0) ? "ninguno" : ""}
-                  </p>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
+                      Sabores: {item.sabores.join(", ")}
+                    </span>
+                  </div>
+                  {renderExtras(item.extras, item.size)}
                 </>
               ) : (
                 <>
@@ -1143,8 +1405,32 @@ function MeseroView({ token, onSendOrder }) {
               {item.observation && (
                 <p className="text-[11px] text-amber-700">Observación: {item.observation}</p>
               )}
+              <div className="mt-2 flex justify-end">
+                <PastelButton
+                  type="button"
+                  variant="soft"
+                  className="text-[11px] px-2 py-1"
+                  onClick={() => removeCartItem(item.id)}
+                >
+                  Quitar del carrito
+                </PastelButton>
+              </div>
             </div>
           ))}
+
+          {cart.length > 0 && (
+            <div className="mt-2 flex items-center gap-2">
+              <PastelButton
+                type="button"
+                variant="soft"
+                className="text-xs"
+                onClick={clearCart}
+              >
+                Vaciar carrito
+              </PastelButton>
+            </div>
+          )}
+
           {cart.length === 0 && (
             <p className="text-xs text-rose-400">
               Añade helados al carrito para enviar el pedido a caja.
@@ -1152,7 +1438,7 @@ function MeseroView({ token, onSendOrder }) {
           )}
         </div>
       </Card>
-      <Card title="Enviar pedido a caja">
+      <Card title="Enviar pedido a caja" variant="mesero">
         <div className="space-y-3">
           <div className="flex justify-center">
             <PastelButton
@@ -1162,7 +1448,14 @@ function MeseroView({ token, onSendOrder }) {
               disabled={cart.length === 0 || isSending}
               className="w-full max-w-xs"
             >
-              {isSending ? "Enviando..." : "Enviar carrito a caja"}
+              {isSending ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white"></span>
+                  Enviando...
+                </span>
+              ) : (
+                "Enviar carrito a caja"
+              )}
             </PastelButton>
           </div>
           {orderStatus && (
@@ -1189,7 +1482,7 @@ function MeseroView({ token, onSendOrder }) {
                   <p className="text-xs font-semibold text-rose-700">Pedido #{order.id}</p>
                   <p className="text-[11px] text-rose-500">{order.created_at_readable}</p>
                 </div>
-                <div className="flex gap-1">
+                <div className="flex gap-1 items-center">
                   <span className={`text-[11px] px-2 py-1 rounded-full ${order.status === "cancelled" ? "bg-rose-100 text-rose-700" : order.status === "entregado" ? "bg-blue-100 text-blue-700" : order.status === "apunto_salida" ? "bg-violet-100 text-violet-700" : order.status === "cocinando" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-800"}`}>
                     {order.status === "pending" ? "Pendiente" : order.status === "cocinando" ? "Cocinando" : order.status === "apunto_salida" ? "Listo para salida" : order.status === "entregado" ? "Entregado" : order.status === "cancelled" ? "Cancelado" : order.status}
                   </span>
@@ -1217,6 +1510,36 @@ function MeseroView({ token, onSendOrder }) {
                       Cliente/Placa: {item.plate || "sin placa"}
                     </span>
                   </div>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
+                      Sabores: {item.sabores.join(", ")}
+                    </span>
+                    {item.extras.salsa && (
+                      <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-rose-100 text-rose-700 border border-rose-200">
+                        Salsa
+                      </span>
+                    )}
+                    {item.extras.chispa && (
+                      <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-cyan-100 text-cyan-700 border border-cyan-200">
+                        Chispas
+                      </span>
+                    )}
+                    {item.extras.tajin && (
+                      <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-cyan-100 text-cyan-700 border border-cyan-200">
+                        Tajín
+                      </span>
+                    )}
+                    {item.extras.galleta > 0 && (
+                      <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+                        Galletas: {item.extras.galleta}
+                      </span>
+                    )}
+                    {(!item.extras.salsa && !item.extras.chispa && !item.extras.tajin && item.extras.galleta <= 0) && (
+                      <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-300">
+                        Extras: ninguno
+                      </span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -1235,6 +1558,79 @@ function CajaView({ token }) {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
   const [statusFilter, setStatusFilter] = useState("undelivered");
   const [orderUpdates, setOrderUpdates] = useState({});
+
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat("es-CO", {
+      style: "currency",
+      currency: "COP",
+      maximumFractionDigits: 0,
+    }).format(value);
+  };
+
+  const printOrderReceipt = (order) => {
+    if (!order) return;
+
+    const itemsText = order.items
+      .map((item, idx) => {
+        const extras = [];
+        if (item.extras?.salsa) extras.push("Salsa");
+        if (item.extras?.tajin) extras.push("Tajín");
+        if (item.extras?.chispa) extras.push("Chispas");
+        if (item.extras?.galleta > 0) extras.push(`Galletas x${item.extras.galleta}`);
+        return `${String(idx + 1).padStart(2, "0")}. ${item.quantity}x ${item.sabores.join(", ")} (${item.size}) ${formatCurrency(item.total)}\nLOC:${item.location || "-"} PL:${item.plate || "-"}${extras.length ? `\nEX:${extras.join(", ")}` : ""}${item.observation ? `\nOBS:${item.observation}` : ""}`;
+      })
+      .join("\n------------------------------\n");
+
+    const totalAmount = order.total || order.items.reduce((acc, i) => acc + (i.total || 0), 0);
+
+    const receiptHtml = `
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Comanda #${order.id}</title>
+          <style>
+            * { box-sizing: border-box; }
+            body { font-family: "Courier New", Courier, monospace; width: 280px; margin:0; padding: 8px; }
+            .receipt { width: 100%; }
+            .header { text-align: center; font-size: 12px; margin-bottom: 8px; }
+            .divider { border-top: 1px dashed #333; margin: 6px 0; }
+            .line { font-size: 12px; margin-bottom: 4px; }
+            .total { font-size: 14px; font-weight: bold; margin-top: 8px; }
+            .small { font-size: 10px; color: #444; }
+            @media print { body { width: 58mm; margin: 0; padding: 2mm; } }
+          </style>
+        </head>
+        <body>
+          <div class="receipt">
+            <div class="header">
+              <div>CREMA DE NATA</div>
+              <div><small>Comanda térmica</small></div>
+              <div>Pedido #${order.id}</div>
+              <div>${order.created_at_readable || new Date().toLocaleString()}</div>
+              <div>${order.status}</div>
+            </div>
+            <div class="divider"></div>
+            <pre class="line">${itemsText}</pre>
+            <div class="divider"></div>
+            <div class="total">TOTAL: ${formatCurrency(totalAmount)}</div>
+            <div class="small">Cliente: ${order.client_plate || "-"} | Pago: ${order.paid ? "SÍ" : "NO"} - ${order.payment_method || "-"}</div>
+            <div class="small">Gracias por su compra</div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const newWindow = window.open("", "_blank", "width=760,height=800");
+    if (!newWindow) {
+      alert("No se pudo abrir ventana de impresión. Revisa tu bloqueador de popups.");
+      return;
+    }
+
+    newWindow.document.write(receiptHtml);
+    newWindow.document.close();
+    newWindow.focus();
+    setTimeout(() => newWindow.print(), 250);
+  };
 
   const fetchOrders = async () => {
     const dateParam = selectedDate ? `?date=${selectedDate}` : "";
@@ -1278,6 +1674,27 @@ function CajaView({ token }) {
     return () => clearInterval(id);
   }, [selectedDate]);
 
+  const filteredOrders = orders
+    .filter((order) => {
+      if (statusFilter === "undelivered")
+        return ["pending", "cocinando", "apunto_salida"].includes(order.status);
+      return order.status === statusFilter;
+    })
+    .sort((a, b) => {
+      const stateOrder = { pending: 0, cocinando: 1, apunto_salida: 2, entregado: 3, cancelled: 4 };
+      if (stateOrder[a.status] !== stateOrder[b.status]) return stateOrder[a.status] - stateOrder[b.status];
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
+
+  const summary = {
+    total: filteredOrders.length,
+    pending: filteredOrders.filter((o) => ["pending", "cocinando", "apunto_salida"].includes(o.status)).length,
+    delivered: filteredOrders.filter((o) => o.status === "entregado").length,
+    cancelled: filteredOrders.filter((o) => o.status === "cancelled").length,
+    revenue: filteredOrders.reduce((acc, o) => acc + (o.total || 0), 0),
+    items: filteredOrders.reduce((acc, o) => acc + (o.items?.reduce((iacc, item) => iacc + (item.quantity || 0), 0) || 0), 0),
+  };
+
   const sizeLabel = {
     pequeno: "Pequeño",
     mediano: "Mediano",
@@ -1285,7 +1702,7 @@ function CajaView({ token }) {
   };
 
   return (
-    <Card title="Pedidos para cocina y caja">
+    <Card title="Pedidos para cocina y caja" variant="caja">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div className="flex gap-2 items-center">
           <span className="text-xs text-rose-500">Filtrar por fecha:</span>
@@ -1322,13 +1739,33 @@ function CajaView({ token }) {
           ))}
         </div>
       </div>
+
+      <div className="grid grid-cols-2 gap-2 mb-3 text-[11px]">
+        <div className="rounded-lg border border-rose-100 bg-white p-2">
+          <p className="text-rose-500 font-semibold">Total pedidos</p>
+          <span className="font-bold text-rose-700">{summary.total}</span>
+        </div>
+        <div className="rounded-lg border border-amber-100 bg-white p-2">
+          <p className="text-amber-500 font-semibold">En proceso</p>
+          <span className="font-bold text-amber-700">{summary.pending}</span>
+        </div>
+        <div className="rounded-lg border border-emerald-100 bg-white p-2">
+          <p className="text-emerald-500 font-semibold">Entregados</p>
+          <span className="font-bold text-emerald-700">{summary.delivered}</span>
+        </div>
+        <div className="rounded-lg border border-slate-100 bg-white p-2">
+          <p className="text-slate-500 font-semibold">Cancelados</p>
+          <span className="font-bold text-slate-700">{summary.cancelled}</span>
+        </div>
+        <div className="col-span-2 rounded-lg border border-cyan-100 bg-white p-2">
+          <p className="text-cyan-500 font-semibold">Ingresos</p>
+          <span className="font-bold text-cyan-700">{formatCurrency(summary.revenue)}</span>
+          <p className="text-[10px] text-slate-500 mt-1">Unidades despachadas: {summary.items}</p>
+        </div>
+      </div>
+
       <div className="space-y-4 max-h-[28rem] overflow-auto pr-1">
-        {orders
-          .filter((order) => {
-            if (statusFilter === "undelivered") return ["pending", "cocinando", "apunto_salida"].includes(order.status);
-            return order.status === statusFilter;
-          })
-          .map((order) => {
+        {filteredOrders.map((order) => {
           const update = orderUpdates[order.id] || { status: order.status, observation: order.observation || "" };
           const isFrozen = order.status === "entregado" || order.status === "cancelled";
           return (
@@ -1367,16 +1804,12 @@ function CajaView({ token }) {
                     {item.observation && (
                       <p className="text-[11px] text-amber-700">Observación: {item.observation}</p>
                     )}
-                    <div className="flex flex-wrap gap-2 text-slate-600">
-                      <span>Sabores: {item.sabores.join(", ")}</span>
-                      <span>
-                        Extras:{" "}
-                        {item.extras.salsa ? "salsa" : ""}
-                        {item.extras.chispa ? (item.extras.salsa ? ", chispas" : "chispas") : ""}
-                        {item.extras.galleta ? (item.extras.salsa || item.extras.chispa ? ", galleta" : "galleta") : ""}
-                        {(!item.extras.salsa && !item.extras.chispa && !item.extras.galleta) ? " ninguno" : ""}
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
+                        Sabores: {item.sabores.join(", ")}
                       </span>
                     </div>
+                    {renderExtras(item.extras, item.size)}
                   </div>
                 ))}
               </div>
@@ -1426,11 +1859,21 @@ function CajaView({ token }) {
                     Guardar
                   </button>
                 </div>
+                <div className="mt-2 flex justify-end">
+                  <PastelButton
+                    type="button"
+                    variant="outline"
+                    className="text-xs"
+                    onClick={() => printOrderReceipt(order)}
+                  >
+                    Imprimir recibo
+                  </PastelButton>
+                </div>
               </div>
             </div>
           );
         })}
-        {orders.length === 0 && (
+        {filteredOrders.length === 0 && (
           <p className="text-xs text-rose-400">
             Aún no hay pedidos en cola. Esperando dulces órdenes...
           </p>

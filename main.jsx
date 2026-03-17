@@ -15,7 +15,7 @@ function getApiUrl() {
   if (isLocal) return "http://localhost:4000";
 
   // Producción (Netlify) -> Render
-  return "https://srv-d6s4n9khg0os73f04fg0.onrender.com";
+  return "https://nataback.onrender.com";
 }
 
 const API_URL = getApiUrl();
